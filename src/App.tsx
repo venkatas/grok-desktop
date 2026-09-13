@@ -8,6 +8,7 @@ import { SessionList } from "./panes/SessionList";
 import { Home } from "./screens/Home";
 import { Setup } from "./screens/Setup";
 import type { AppStatus, ChatItem, DiffFile, PermissionOption, Screen, SessionRow } from "./lib/types";
+import { formatToolDetail } from "./lib/toolDetail";
 import "./App.css";
 
 type ConfigOpt = { configId: string; values?: { value: string; name?: string }[] };
@@ -46,7 +47,11 @@ function applyUpdate(items: ChatItem[], params: Record<string, unknown>): ChatIt
     const id = String(update.toolCallId ?? "");
     return items.map((it) =>
       it.kind === "tool" && it.id === id
-        ? { ...it, status: String(update.status ?? it.status), detail: JSON.stringify(update.content ?? update.rawOutput ?? it.detail ?? "") }
+        ? {
+            ...it,
+            status: String(update.status ?? it.status),
+            detail: formatToolDetail(update.content ?? update.rawOutput) || it.detail,
+          }
         : it,
     );
   }

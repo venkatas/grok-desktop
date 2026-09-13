@@ -118,7 +118,7 @@ impl AgentHost {
                 "protocolVersion": 1,
                 "clientCapabilities": {
                     "fs": { "readTextFile": true, "writeTextFile": false },
-                    "terminal": true
+                    "terminal": false
                 },
                 "clientInfo": {
                     "name": "grok-build",

@@ -13,7 +13,12 @@ export function ToolCard({
         <b>{title}</b>
         <span className={`tool-status status-${status}`}>{status}</span>
       </div>
-      {detail ? <pre className="tool-detail">{detail}</pre> : null}
+      {detail ? (
+        <details className="tool-detail-wrap">
+          <summary>output</summary>
+          <pre className="tool-detail">{detail}</pre>
+        </details>
+      ) : null}
     </div>
   );
 }

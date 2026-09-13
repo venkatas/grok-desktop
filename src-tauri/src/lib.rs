@@ -163,6 +163,8 @@ fn handle_event(app: &AppHandle, live: &Live, ev: HostEvent) -> bool {
                 let _ = live.host.respond_fs_read(&id, Path::new(path));
             } else if method == "fs/write_text_file" {
                 let _ = live.host.respond_error(&id, "writeTextFile is disabled");
+            } else if method.starts_with("terminal/") {
+                let _ = live.host.respond_error(&id, "in-app terminal is not available");
             }
             true
         }
