@@ -153,6 +153,7 @@ export default function App() {
       setItems([]);
       setLiveId(null);
       setBanner(null);
+      await startSession(path);
     } catch (e) {
       setBanner(String(e));
     }
@@ -168,24 +169,30 @@ export default function App() {
     if (effortOpt?.values?.[0]) setEffort(effortOpt.values[0].value);
   }
 
-  async function newSession() {
-    if (!folder) return;
+  async function startSession(cwd: string): Promise<string | null> {
     try {
       const res = await invoke<{ sessionId: string; configOptions?: unknown }>("session_new", {
-        cwd: folder,
+        cwd,
         worktree,
       });
       setLiveId(res.sessionId);
       setItems([]);
       applyConfig(res.configOptions);
       setBanner(null);
-      const rows = await invoke<SessionRow[]>("list_sessions_cmd", { cwd: folder });
+      const rows = await invoke<SessionRow[]>("list_sessions_cmd", { cwd });
       setSessions(rows);
+      return res.sessionId;
     } catch (e) {
       const msg = String(e);
       if (msg.toLowerCase().includes("worktree")) setWorktreeOk(false);
       setBanner(msg);
+      return null;
     }
+  }
+
+  async function newSession() {
+    if (!folder) return;
+    await startSession(folder);
   }
 
   async function selectSession(id: string) {
@@ -207,7 +214,11 @@ export default function App() {
 
   async function send() {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || !folder) return;
+    if (!liveId) {
+      const id = await startSession(folder);
+      if (!id) return;
+    }
     setDraft("");
     setItems((cur) => [...cur, { kind: "user", text }]);
     setRunning(true);

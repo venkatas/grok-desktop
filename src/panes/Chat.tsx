@@ -25,6 +25,9 @@ export function Chat({
   return (
     <section className="chat">
       <div className="msgs">
+        {items.length === 0 ? (
+          <p className="muted">Ask Grok about this folder. + New session starts a fresh thread.</p>
+        ) : null}
         {items.map((item, i) => {
           if (item.kind === "user") return <div key={i} className="u">{item.text}</div>;
           if (item.kind === "agent") return <div key={i} className="a">{item.text}</div>;

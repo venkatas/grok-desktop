@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Composer } from "./components/Composer";
 import { PermissionCard } from "./components/PermissionCard";
 import { ToolCard } from "./components/ToolCard";
+import { Chat } from "./panes/Chat";
 import { Diffs } from "./panes/Diffs";
 import { SessionList } from "./panes/SessionList";
 
@@ -66,6 +67,23 @@ describe("diffs", () => {
       />,
     );
     expect(screen.getByText(/a.rs/)).toBeTruthy();
+  });
+});
+
+describe("chat empty state", () => {
+  it("tells you how to start", () => {
+    render(
+      <Chat
+        items={[]}
+        draft=""
+        running={false}
+        onDraft={() => {}}
+        onSend={() => {}}
+        onStop={() => {}}
+        onPermission={() => {}}
+      />,
+    );
+    expect(screen.getByText(/Ask Grok about this folder/)).toBeTruthy();
   });
 });
 
