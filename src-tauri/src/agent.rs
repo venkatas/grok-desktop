@@ -29,10 +29,15 @@ pub struct AgentHost {
     child: Mutex<Option<Child>>,
 }
 
+pub fn agent_stdio_args() -> &'static [&'static str] {
+    // --no-leader is an option of `grok agent`, not of `stdio`.
+    &["agent", "--no-leader", "stdio"]
+}
+
 impl AgentHost {
     pub fn spawn(bin: &Path, on_event: EventFn) -> Result<Self, String> {
         let mut child = Command::new(bin)
-            .args(["agent", "stdio", "--no-leader"])
+            .args(agent_stdio_args())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -40,11 +45,28 @@ impl AgentHost {
             .map_err(|e| format!("failed to start grok: {e}"))?;
         let stdin = child.stdin.take().ok_or("no stdin")?;
         let stdout = child.stdout.take().ok_or("no stdout")?;
+        let stderr = child.stderr.take();
+        let stderr_buf = Arc::new(Mutex::new(String::new()));
+        if let Some(err) = stderr {
+            let buf = stderr_buf.clone();
+            thread::spawn(move || {
+                let reader = BufReader::new(err);
+                for line in reader.lines().flatten() {
+                    if let Ok(mut s) = buf.lock() {
+                        if s.len() < 16_384 {
+                            s.push_str(&line);
+                            s.push('\n');
+                        }
+                    }
+                }
+            });
+        }
         Self::from_rw(
             Box::new(stdin),
             BufReader::new(stdout),
             Some(child),
             on_event,
+            stderr_buf,
         )
     }
 
@@ -53,10 +75,11 @@ impl AgentHost {
         reader: R,
         child: Option<Child>,
         on_event: EventFn,
+        stderr_buf: Arc<Mutex<String>>,
     ) -> Result<Self, String> {
         let pending: Arc<Mutex<HashMap<u64, Pending>>> = Arc::new(Mutex::new(HashMap::new()));
         let pending_r = pending.clone();
-        thread::spawn(move || read_loop(reader, pending_r, on_event));
+        thread::spawn(move || read_loop(reader, pending_r, on_event, stderr_buf));
         Ok(Self {
             writer: Arc::new(Mutex::new(writer)),
             next_id: Mutex::new(1),
@@ -214,6 +237,7 @@ fn read_loop<R: BufRead>(
     reader: R,
     pending: Arc<Mutex<HashMap<u64, Pending>>>,
     events: EventFn,
+    stderr_buf: Arc<Mutex<String>>,
 ) {
     let mut lines = reader.lines();
     while let Some(Ok(line)) = lines.next() {
@@ -244,9 +268,16 @@ fn read_loop<R: BufRead>(
             Err(_) => {}
         }
     }
+    let detail = stderr_buf
+        .lock()
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("agent process exited: {s}"))
+        .unwrap_or_else(|| "agent process exited".to_string());
     if let Ok(mut map) = pending.lock() {
         for (_, p) in map.drain() {
-            let _ = p.tx.send(Err("agent process exited".into()));
+            let _ = p.tx.send(Err(detail.clone()));
         }
     }
     events(HostEvent::Exit);
@@ -425,6 +456,7 @@ mod tests {
             Arc::new(move |e| {
                 let _ = tx.send(e);
             }),
+            Arc::new(Mutex::new(String::new())),
         )
         .unwrap();
         Pair { host, events: rx }
@@ -432,6 +464,11 @@ mod tests {
 
     fn recv_timeout(rx: &mpsc::Receiver<HostEvent>, dur: Duration) -> Option<HostEvent> {
         rx.recv_timeout(dur).ok()
+    }
+
+    #[test]
+    fn stdio_args_put_no_leader_before_subcommand() {
+        assert_eq!(agent_stdio_args(), ["agent", "--no-leader", "stdio"]);
     }
 
     #[test]
