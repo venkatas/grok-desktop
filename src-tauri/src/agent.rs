@@ -145,7 +145,7 @@ impl AgentHost {
     pub fn session_load(&self, cwd: &str, id: &str) -> Result<Value, String> {
         self.request(
             "session/load",
-            json!({ "cwd": cwd, "sessionId": id }),
+            json!({ "cwd": cwd, "sessionId": id, "mcpServers": [] }),
             Duration::from_secs(30),
         )
     }
@@ -227,6 +227,18 @@ impl AgentHost {
     }
 }
 
+fn rpc_error_text(err: &Value) -> String {
+    let msg = err
+        .get("message")
+        .and_then(|m| m.as_str())
+        .unwrap_or("ACP error");
+    match err.get("data") {
+        Some(Value::String(d)) => format!("{msg}: {d}"),
+        Some(d) => format!("{msg}: {d}"),
+        None => msg.to_string(),
+    }
+}
+
 fn id_as_u64(id: &Value) -> Option<u64> {
     id.as_u64()
         .or_else(|| id.as_i64().map(|i| i as u64))
@@ -250,7 +262,7 @@ fn read_loop<R: BufRead>(
                     if let Ok(mut map) = pending.lock() {
                         if let Some(p) = map.remove(&n) {
                             let msg = if let Some(err) = error {
-                                Err(err.to_string())
+                                Err(rpc_error_text(&err))
                             } else {
                                 Ok(result.unwrap_or(Value::Null))
                             };
@@ -340,6 +352,15 @@ mod tests {
                     );
                 }
                 "session/load" => {
+                    if params.get("mcpServers").is_none() {
+                        let _ = write!(
+                            writer,
+                            "{}",
+                            crate::rpc::error_line(&id.unwrap(), "missing field `mcpServers`")
+                        );
+                        let _ = writer.flush();
+                        continue;
+                    }
                     let sid = params.get("sessionId").cloned().unwrap_or(json!("sess-1"));
                     let _ = write!(
                         writer,
