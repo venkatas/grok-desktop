@@ -133,7 +133,13 @@ impl AgentHost {
     pub fn session_new(&self, cwd: &str) -> Result<Value, String> {
         let result = self.request(
             "session/new",
-            json!({ "cwd": cwd, "mcpServers": [] }),
+            json!({
+                "cwd": cwd,
+                "mcpServers": [],
+                "_meta": {
+                    "rules": "Write in plain sentences. Do not use markdown, tables, headings, bold, or code fences."
+                }
+            }),
             Duration::from_secs(30),
         )?;
         if result.get("sessionId").and_then(|s| s.as_str()).is_none() {
