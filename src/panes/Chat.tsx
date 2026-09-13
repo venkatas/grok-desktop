@@ -1,3 +1,4 @@
+import { AgentMarkdown } from "../components/AgentMarkdown";
 import { Composer } from "../components/Composer";
 import { PermissionCard } from "../components/PermissionCard";
 import { ToolCard } from "../components/ToolCard";
@@ -30,7 +31,7 @@ export function Chat({
         ) : null}
         {items.map((item, i) => {
           if (item.kind === "user") return <div key={i} className="u">{item.text}</div>;
-          if (item.kind === "agent") return <div key={i} className="a">{item.text}</div>;
+          if (item.kind === "agent") return <AgentMarkdown key={i} text={item.text} />;
           if (item.kind === "thought") {
             return (
               <details key={i} className="thought">
